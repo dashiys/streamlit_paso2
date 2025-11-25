@@ -2,14 +2,12 @@ import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage, HumanMessage
 
-# ------- CONFIG GENERAL -------
 st.set_page_config(page_title="Chatbot Básico", page_icon="🤖", layout="wide")
 
-# ------- MENÚ DERECHO --------
 with st.sidebar:
     st.header("⚙️ Configuración del modelo")
 
-    modelo = st.selectbox(
+    modelo_usuario = st.selectbox(
         "Modelo:",
         ["gemini-2.5-flash", "gemini-pro", "gemini-1.5-flash"],
         index=0
@@ -31,10 +29,14 @@ with st.sidebar:
 st.title("🤖 Chatbot - paso 2 - con LangChain")
 st.markdown("Este es un *chatbot de ejemplo* construido con LangChain + Streamlit.")
 
+if modelo_usuario == "gemini-2.5-flash":
+    modelo_real = "gemini-2.5-flash"
+else:
+    # Los otros modelos no existen → para que NO se rompa:
+    modelo_real = "gemini-2.5-flash"
 
-# ------- MODELO DINÁMICO -------
 chat_model = ChatGoogleGenerativeAI(
-    model=modelo,
+    model=modelo_real,
     temperature=temperatura
 )
 
