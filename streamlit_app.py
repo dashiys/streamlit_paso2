@@ -2,113 +2,65 @@ import streamlit as st
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage, HumanMessage
 
+# ------- CONFIG GENERAL -------
 st.set_page_config(page_title="Chatbot Básico", page_icon="🤖", layout="wide")
-
-# ------- PERSISTENCIA DE CONFIG -------
-if "modelo" not in st.session_state:
-    st.session_state.modelo = "gemini-2.5-flash"
-
-if "temp" not in st.session_state:
-    st.session_state.temp = 0.7
-
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = []
 
 # ------- MENÚ DERECHO --------
 with st.sidebar:
     st.header("⚙️ Configuración del modelo")
 
-    # Cambiar modelo sin romper lógica
     modelo = st.selectbox(
         "Modelo:",
-        ["gemini-2.5-flash", "gemini-pro", "gemini-1.5-flash"],
-        index=["gemini-2.5-flash", "gemini-pro", "gemini-1.5-flash"].index(st.session_state.modelo)
+        ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+        index=0
     )
-    st.session_state.modelo = modelo  # guardamos elección
 
-    # Slider de temperatura
     temperatura = st.slider(
         "Temperatura",
         min_value=0.0,
         max_value=1.0,
         step=0.01,
-        value=st.session_state.temp
-    )
-    st.session_state.temp = temperatura  # guardamos elección
-
-    # Estilo de respuesta
-    modo = st.radio(
-        "Estilo de respuesta:",
-        ["Corta", "Normal", "Detallada"],
-        index=1
+        value=0.7
     )
 
-    # Botón limpiar chat
     if st.button("🧹 Limpiar conversación"):
         st.session_state.mensajes = []
         st.rerun()
-
-    # Botón descargar chat
-    if st.button("📄 Descargar conversación"):
-        texto = "\n".join(
-            ["USER: " + m.content if isinstance(m, HumanMessage)
-             else "BOT: " + m.content for m in st.session_state.mensajes]
-        )
-        st.download_button(
-            "Guardar archivo",
-            texto,
-            file_name="conversacion.txt"
-        )
 
 # ------- TÍTULO DEL CHAT -------
 st.title("🤖 Chatbot - paso 2 - con LangChain")
 st.markdown("Este es un *chatbot de ejemplo* construido con LangChain + Streamlit.")
 
-# ------- MENSAJE DE BIENVENIDA -------
-if len(st.session_state.mensajes) == 0:
-    bienvenida = AIMessage(content="¡Hola! 👋 ¿En qué puedo ayudarte hoy?")
-    st.session_state.mensajes.append(bienvenida)
-
 # ------- MODELO DINÁMICO -------
 chat_model = ChatGoogleGenerativeAI(
-    model=st.session_state.modelo,
-    temperature=st.session_state.temp
+    model=modelo,
+    temperature=temperatura
 )
 
-# ------- LIMITAR HISTORIAL (optimización) -------
-MAX_HISTORY = 15
-st.session_state.mensajes = st.session_state.mensajes[-MAX_HISTORY:]
+# ------- HISTORIAL DE MENSAJES -------
+if "mensajes" not in st.session_state:
+    st.session_state.mensajes = []
 
-# ------- RENDER HISTORIAL -------
+# Renderizar historial
 for msg in st.session_state.mensajes:
     role = "assistant" if isinstance(msg, AIMessage) else "user"
     with st.chat_message(role):
-        st.markdown(msg.content, unsafe_allow_html=True)
+        st.markdown(msg.content)
 
 # ------- INPUT DEL USUARIO -------
 pregunta = st.chat_input("Escribe tu mensaje:")
 
 if pregunta:
-
-    # Mostrar mensaje del usuario
     with st.chat_message("user"):
         st.markdown(pregunta)
 
-    # Ajustar mensaje según estilo
-    if modo == "Corta":
-        mensaje_final = pregunta + "\nResponde en una frase breve."
-    elif modo == "Detallada":
-        mensaje_final = pregunta + "\nResponde con detalle y paso a paso."
-    else:
-        mensaje_final = pregunta
+    st.session_state.mensajes.append(HumanMessage(content=pregunta))
 
-    st.session_state.mensajes.append(HumanMessage(content=mensaje_final))
+    respuesta = chat_model.invoke(st.session_state.mensajes)
 
-    # Respuesta del modelo con spinner
     with st.chat_message("assistant"):
-        with st.spinner("Escribiendo..."):
-            respuesta = chat_model.invoke(st.session_state.mensajes)
-        st.markdown(respuesta.content, unsafe_allow_html=True)
+        st.markdown(respuesta.content)
 
     st.session_state.mensajes.append(respuesta)
+
 
