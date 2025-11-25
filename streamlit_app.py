@@ -5,62 +5,106 @@ from langchain_core.messages import AIMessage, HumanMessage
 # ------- CONFIG GENERAL -------
 st.set_page_config(page_title="Chatbot Básico", page_icon="🤖", layout="wide")
 
+# ------- PERSISTENCIA DE CONFIG -------
+if "modelo" not in st.session_state:
+    st.session_state.modelo = "gemini-2.5-flash"
+
+if "temp" not in st.session_state:
+    st.session_state.temp = 0.7
+
+if "mensajes" not in st.session_state:
+    st.session_state.mensajes = []
+
 # ------- MENÚ DERECHO --------
 with st.sidebar:
     st.header("⚙️ Configuración del modelo")
 
+    # Modelo
     modelo = st.selectbox(
         "Modelo:",
-        ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
-        index=0
+        ["gemini-2.5-flash", "gemini-pro", "gemini-1.5-flash"],
+        index=["gemini-2.5-flash", "gemini-pro", "gemini-1.5-flash"].index(st.session_state.modelo)
     )
+    st.session_state.modelo = modelo
 
+    # Slider de temperatura
     temperatura = st.slider(
         "Temperatura",
         min_value=0.0,
         max_value=1.0,
         step=0.01,
-        value=0.7
+        value=st.session_state.temp
+    )
+    st.session_state.temp = temperatura
+
+    # Estilo de respuesta
+    modo = st.radio(
+        "Estilo de respuesta:",
+        ["Corta", "Normal", "Detallada"],
+        index=1
     )
 
+    # Botón limpiar chat
     if st.button("🧹 Limpiar conversación"):
         st.session_state.mensajes = []
         st.rerun()
+
+    # Botón descargar chat
+    if st.button("📄 Descargar conversación"):
+        texto = "\n".join(
+            ["USER: " + m.content if isinstance(m, HumanMessage)
+             else "BOT: " + m.content for m in st.session_state.mensajes]
+        )
+        st.download_button("Guardar archivo", texto, file_name="conversacion.txt")
 
 # ------- TÍTULO DEL CHAT -------
 st.title("🤖 Chatbot - paso 2 - con LangChain")
 st.markdown("Este es un *chatbot de ejemplo* construido con LangChain + Streamlit.")
 
-# ------- MODELO DINÁMICO -------
+# ------- MENSAJE DE BIENVENIDA -------
+if len(st.session_state.mensajes) == 0:
+    bienvenida = AIMessage(content="¡Hola! 👋 ¿En qué puedo ayudarte hoy?")
+    st.session_state.mensajes.append(bienvenida)
+
+# ------- MODELO REAL 
 chat_model = ChatGoogleGenerativeAI(
-    model=modelo,
-    temperature=temperatura
+    model="gemini-2.5-flash",      #  <<< 🔥 ÚNICO MODELO REAL — NO CAMBIA NUNCA
+    temperature=st.session_state.temp
 )
 
-# ------- HISTORIAL DE MENSAJES -------
-if "mensajes" not in st.session_state:
-    st.session_state.mensajes = []
+# ------- LIMITAR HISTORIAL -------
+MAX_HISTORY = 15
+st.session_state.mensajes = st.session_state.mensajes[-MAX_HISTORY:]
 
-# Renderizar historial
+# ------- RENDER HISTORIAL -------
 for msg in st.session_state.mensajes:
     role = "assistant" if isinstance(msg, AIMessage) else "user"
     with st.chat_message(role):
-        st.markdown(msg.content)
+        st.markdown(msg.content, unsafe_allow_html=True)
 
 # ------- INPUT DEL USUARIO -------
 pregunta = st.chat_input("Escribe tu mensaje:")
 
 if pregunta:
+
     with st.chat_message("user"):
         st.markdown(pregunta)
 
-    st.session_state.mensajes.append(HumanMessage(content=pregunta))
+    # Ajuste del estilo
+    if modo == "Corta":
+        mensaje_final = pregunta + "\nResponde en una frase breve."
+    elif modo == "Detallada":
+        mensaje_final = pregunta + "\nResponde con detalle y paso a paso."
+    else:
+        mensaje_final = pregunta
 
-    respuesta = chat_model.invoke(st.session_state.mensajes)
+    st.session_state.mensajes.append(HumanMessage(content=mensaje_final))
 
+    # Respuesta del bot
     with st.chat_message("assistant"):
-        st.markdown(respuesta.content)
+        with st.spinner("Escribiendo..."):
+            respuesta = chat_model.invoke(st.session_state.mensajes)
+        st.markdown(respuesta.content, unsafe_allow_html=True)
 
     st.session_state.mensajes.append(respuesta)
-
 
